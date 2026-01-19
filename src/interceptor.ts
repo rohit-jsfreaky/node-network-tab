@@ -51,12 +51,22 @@ export interface RequestErrorEvent {
   duration: number;
 }
 
+export interface TimingUpdateEvent {
+  id: string;
+  dns: number;
+  tcp: number;
+  ttfb: number;
+  download: number;
+  total: number;
+}
+
 export interface InterceptorEvents {
   "request-start": (event: RequestStartEvent) => void;
   "request-body": (event: RequestBodyEvent) => void;
   "response-headers": (event: ResponseHeadersEvent) => void;
   "response-complete": (event: ResponseCompleteEvent) => void;
   "request-error": (event: RequestErrorEvent) => void;
+  "timing-update": (event: TimingUpdateEvent) => void;
 }
 
 // ============================================================================
@@ -240,6 +250,15 @@ function createInterceptor(
       startTime,
     });
 
+    // Timing breakdown tracker (shared between socket events and response handler)
+    const timing = {
+      dnsStart: startTime,
+      dnsEnd: 0,
+      tcpEnd: 0,
+      ttfbEnd: 0,
+      downloadEnd: 0,
+    };
+
     // Create wrapped callback to intercept response
     const wrappedCallback = (res: http.IncomingMessage) => {
       // Emit response headers
@@ -277,7 +296,31 @@ function createInterceptor(
         } else if (event === "end") {
           endListeners.push(listener as () => void);
           return originalOn(event, () => {
-            const duration = Date.now() - startTime;
+            const endTime = Date.now();
+            timing.downloadEnd = endTime;
+            const duration = endTime - startTime;
+
+            // Emit timing breakdown
+            const dns = timing.dnsEnd ? timing.dnsEnd - startTime : 0;
+            const tcp = timing.tcpEnd
+              ? timing.tcpEnd - (timing.dnsEnd || startTime)
+              : 0;
+            const ttfb = timing.ttfbEnd
+              ? timing.ttfbEnd - (timing.tcpEnd || timing.dnsEnd || startTime)
+              : 0;
+            const download =
+              timing.downloadEnd -
+              (timing.ttfbEnd || timing.tcpEnd || timing.dnsEnd || startTime);
+
+            interceptorEmitter.emit("timing-update", {
+              id: requestId,
+              dns,
+              tcp,
+              ttfb,
+              download,
+              total: duration,
+            });
+
             interceptorEmitter.emit("response-complete", {
               id: requestId,
               body: stringifyBody(responseChunks),
@@ -302,7 +345,30 @@ function createInterceptor(
           });
         } else if (event === "end") {
           return originalOnce(event, () => {
-            const duration = Date.now() - startTime;
+            const endTime = Date.now();
+            timing.downloadEnd = endTime;
+            const duration = endTime - startTime;
+
+            const dns = timing.dnsEnd ? timing.dnsEnd - startTime : 0;
+            const tcp = timing.tcpEnd
+              ? timing.tcpEnd - (timing.dnsEnd || startTime)
+              : 0;
+            const ttfb = timing.ttfbEnd
+              ? timing.ttfbEnd - (timing.tcpEnd || timing.dnsEnd || startTime)
+              : 0;
+            const download =
+              timing.downloadEnd -
+              (timing.ttfbEnd || timing.tcpEnd || timing.dnsEnd || startTime);
+
+            interceptorEmitter.emit("timing-update", {
+              id: requestId,
+              dns,
+              tcp,
+              ttfb,
+              download,
+              total: duration,
+            });
+
             interceptorEmitter.emit("response-complete", {
               id: requestId,
               body: stringifyBody(responseChunks),
@@ -330,7 +396,30 @@ function createInterceptor(
         });
 
         passThrough.on("end", () => {
-          const duration = Date.now() - startTime;
+          const endTime = Date.now();
+          timing.downloadEnd = endTime;
+          const duration = endTime - startTime;
+
+          const dns = timing.dnsEnd ? timing.dnsEnd - startTime : 0;
+          const tcp = timing.tcpEnd
+            ? timing.tcpEnd - (timing.dnsEnd || startTime)
+            : 0;
+          const ttfb = timing.ttfbEnd
+            ? timing.ttfbEnd - (timing.tcpEnd || timing.dnsEnd || startTime)
+            : 0;
+          const download =
+            timing.downloadEnd -
+            (timing.ttfbEnd || timing.tcpEnd || timing.dnsEnd || startTime);
+
+          interceptorEmitter.emit("timing-update", {
+            id: requestId,
+            dns,
+            tcp,
+            ttfb,
+            download,
+            total: duration,
+          });
+
           interceptorEmitter.emit("response-complete", {
             id: requestId,
             body: stringifyBody(responseChunks),
@@ -435,6 +524,34 @@ function createInterceptor(
       }
       return originalEnd(chunkOrCallback as string, callback);
     };
+
+    // ========================================================================
+    // Socket Event Timing Capture
+    // ========================================================================
+
+    // Listen for socket events to capture timing breakdown
+    clientRequest.on("socket", (socket) => {
+      // DNS Lookup timing
+      socket.on("lookup", () => {
+        timing.dnsEnd = Date.now();
+      });
+
+      // TCP Connect timing
+      socket.on("connect", () => {
+        timing.tcpEnd = Date.now();
+      });
+
+      // For already-connected sockets (keep-alive), mark as immediate
+      if (socket.connecting === false) {
+        timing.dnsEnd = startTime;
+        timing.tcpEnd = startTime;
+      }
+    });
+
+    // TTFB - Time to First Byte (when response event fires)
+    clientRequest.on("response", () => {
+      timing.ttfbEnd = Date.now();
+    });
 
     // Handle request errors
     clientRequest.on("error", (error: Error) => {

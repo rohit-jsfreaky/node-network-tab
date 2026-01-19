@@ -18,11 +18,12 @@
 - 🎨 **Beautiful TUI** - Professional terminal UI with color-coded status
 - ⚡ **Real-time Updates** - See requests as they happen
 - 🔎 **Smart Filtering** - Filter by URL, method (GET/POST), status (200/500), or fuzzy search
+- ⏱️ **Timing Breakdown** - See where time went: DNS, TCP, TTFB, Download with waterfall chart
 - 📋 **Request/Response Details** - View headers, body, and response data
 - 📝 **JSON Formatting** - Pretty-printed JSON bodies
 - ⌨️ **Keyboard Navigation** - Vim-style (j/k) and arrow key support
 - 🔍 **Expand Mode** - View full response body with scrolling
-- 📋 **Copy to Clipboard** - Copy headers/body/response with one key
+- 📋 **Copy to Clipboard** - Copy headers/body/response or as cURL command
 - 🛡️ **Safety First** - Only runs in development mode
 
 ## 📦 Installation

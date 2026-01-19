@@ -7,7 +7,7 @@
 
 import React, { useMemo } from "react";
 import { Box, Text } from "ink";
-import type { RequestLog, RequestStatus } from "../store.js";
+import type { RequestLog, RequestStatus, TimingBreakdown } from "../store.js";
 import prettyMs from "pretty-ms";
 
 // ============================================================================
@@ -91,6 +91,85 @@ function formatHeaders(
       key,
       value: Array.isArray(value) ? value.join(", ") : String(value),
     }));
+}
+
+// ============================================================================
+// Timing Waterfall Component
+// ============================================================================
+
+interface TimingWaterfallProps {
+  timing: TimingBreakdown;
+  width?: number;
+}
+
+function TimingWaterfall({
+  timing,
+  width = 40,
+}: TimingWaterfallProps): React.ReactElement {
+  const total = timing.total || 1;
+
+  // Calculate bar widths proportionally
+  const dnsWidth = Math.max(1, Math.round((timing.dns / total) * width));
+  const tcpWidth = Math.max(1, Math.round((timing.tcp / total) * width));
+  const ttfbWidth = Math.max(1, Math.round((timing.ttfb / total) * width));
+  const downloadWidth = Math.max(
+    1,
+    Math.round((timing.download / total) * width),
+  );
+
+  // Create bar characters
+  const createBar = (w: number, char: string) => char.repeat(Math.max(0, w));
+
+  // Timing data for display
+  const timingData = [
+    {
+      label: "DNS",
+      time: timing.dns,
+      color: "blue" as const,
+      bar: createBar(dnsWidth, "█"),
+    },
+    {
+      label: "TCP",
+      time: timing.tcp,
+      color: "green" as const,
+      bar: createBar(tcpWidth, "█"),
+    },
+    {
+      label: "TTFB",
+      time: timing.ttfb,
+      color: "yellow" as const,
+      bar: createBar(ttfbWidth, "█"),
+    },
+    {
+      label: "Download",
+      time: timing.download,
+      color: "cyan" as const,
+      bar: createBar(downloadWidth, "█"),
+    },
+  ];
+
+  return (
+    <Box flexDirection="column" marginY={1}>
+      <Text bold color="magenta">
+        ⏱️ Timing Breakdown
+      </Text>
+      <Box flexDirection="column" marginLeft={1} marginTop={1}>
+        {timingData.map(({ label, time, color, bar }) => (
+          <Box key={label}>
+            <Text color="gray">{label.padEnd(9)}</Text>
+            <Text color={color}>{bar}</Text>
+            <Text dimColor> {time}ms</Text>
+          </Box>
+        ))}
+        <Box marginTop={1}>
+          <Text color="gray">Total </Text>
+          <Text bold color="white">
+            {timing.total}ms
+          </Text>
+        </Box>
+      </Box>
+    </Box>
+  );
 }
 
 // ============================================================================
@@ -327,6 +406,9 @@ function ResponseView({
         </Text>
         {log.duration > 0 && <Text dimColor> ({prettyMs(log.duration)})</Text>}
       </Box>
+
+      {/* Timing Waterfall */}
+      {log.timing && <TimingWaterfall timing={log.timing} />}
 
       {/* Error message if present */}
       {log.error && (

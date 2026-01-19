@@ -12,6 +12,7 @@ import {
   type ResponseHeadersEvent,
   type ResponseCompleteEvent,
   type RequestErrorEvent,
+  type TimingUpdateEvent,
 } from "./interceptor.js";
 
 // ============================================================================
@@ -19,6 +20,19 @@ import {
 // ============================================================================
 
 export type RequestStatus = number | "PENDING" | "ERROR";
+
+export interface TimingBreakdown {
+  /** Time from request start to DNS lookup complete (ms) */
+  dns: number;
+  /** Time from DNS complete to TCP connection established (ms) */
+  tcp: number;
+  /** Time from connection to first byte received (ms) */
+  ttfb: number;
+  /** Time from first byte to response complete (ms) */
+  download: number;
+  /** Total time (ms) */
+  total: number;
+}
 
 export interface RequestLog {
   id: string;
@@ -35,6 +49,7 @@ export interface RequestLog {
   resHeaders: Record<string, string | string[] | undefined>;
   resBody: string;
   error?: string;
+  timing?: TimingBreakdown;
 }
 
 export type StoreListener = (logs: RequestLog[]) => void;
@@ -195,6 +210,23 @@ class RequestStore {
   }
 
   /**
+   * Update timing breakdown
+   */
+  private updateTiming(event: TimingUpdateEvent): void {
+    const log = this.logs.get(event.id);
+    if (log) {
+      log.timing = {
+        dns: event.dns,
+        tcp: event.tcp,
+        ttfb: event.ttfb,
+        download: event.download,
+        total: event.total,
+      };
+      this.notifyListeners();
+    }
+  }
+
+  /**
    * Attach listeners to the interceptor
    */
   private attachInterceptorListeners(): void {
@@ -218,6 +250,10 @@ class RequestStore {
 
     interceptorEmitter.on("request-error", (event) => {
       this.handleError(event);
+    });
+
+    interceptorEmitter.on("timing-update", (event) => {
+      this.updateTiming(event);
     });
 
     this.isListening = true;
