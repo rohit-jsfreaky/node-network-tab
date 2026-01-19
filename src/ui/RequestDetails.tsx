@@ -7,7 +7,12 @@
 
 import React, { useMemo } from "react";
 import { Box, Text } from "ink";
-import type { RequestLog, RequestStatus, TimingBreakdown } from "../store.js";
+import type {
+  RequestLog,
+  RequestStatus,
+  TimingBreakdown,
+  SizeInfo,
+} from "../store.js";
 import prettyMs from "pretty-ms";
 
 // ============================================================================
@@ -167,6 +172,61 @@ function TimingWaterfall({
             {timing.total}ms
           </Text>
         </Box>
+      </Box>
+    </Box>
+  );
+}
+
+// ============================================================================
+// Size Info Component
+// ============================================================================
+
+interface SizeInfoDisplayProps {
+  size: SizeInfo;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
+
+function SizeInfoDisplay({ size }: SizeInfoDisplayProps): React.ReactElement {
+  const compression = size.encoding ? size.encoding.toUpperCase() : "none";
+  const savings =
+    size.transferred > 0 && size.resource > size.transferred
+      ? Math.round((1 - size.transferred / size.resource) * 100)
+      : 0;
+
+  return (
+    <Box flexDirection="column" marginY={1}>
+      <Text bold color="blue">
+        📦 Response Size
+      </Text>
+      <Box flexDirection="column" marginLeft={1} marginTop={1}>
+        <Box>
+          <Text color="gray">Transferred: </Text>
+          <Text bold color="cyan">
+            {formatBytes(size.transferred)}
+          </Text>
+          {size.encoding && <Text dimColor> ({compression})</Text>}
+        </Box>
+        <Box>
+          <Text color="gray">Resource: </Text>
+          <Text bold color="white">
+            {formatBytes(size.resource)}
+          </Text>
+        </Box>
+        {savings > 0 && (
+          <Box>
+            <Text color="gray">Compression: </Text>
+            <Text bold color="green">
+              {savings}% saved
+            </Text>
+          </Box>
+        )}
       </Box>
     </Box>
   );
@@ -409,6 +469,9 @@ function ResponseView({
 
       {/* Timing Waterfall */}
       {log.timing && <TimingWaterfall timing={log.timing} />}
+
+      {/* Size Info */}
+      {log.size && <SizeInfoDisplay size={log.size} />}
 
       {/* Error message if present */}
       {log.error && (

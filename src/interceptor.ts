@@ -60,6 +60,13 @@ export interface TimingUpdateEvent {
   total: number;
 }
 
+export interface SizeUpdateEvent {
+  id: string;
+  transferred: number;
+  resource: number;
+  encoding: string | null;
+}
+
 export interface InterceptorEvents {
   "request-start": (event: RequestStartEvent) => void;
   "request-body": (event: RequestBodyEvent) => void;
@@ -67,6 +74,7 @@ export interface InterceptorEvents {
   "response-complete": (event: ResponseCompleteEvent) => void;
   "request-error": (event: RequestErrorEvent) => void;
   "timing-update": (event: TimingUpdateEvent) => void;
+  "size-update": (event: SizeUpdateEvent) => void;
 }
 
 // ============================================================================
@@ -269,6 +277,14 @@ function createInterceptor(
         headers: res.headers as Record<string, string | string[] | undefined>,
       });
 
+      // Capture size info from headers
+      const contentLength = res.headers["content-length"];
+      const contentEncoding = res.headers["content-encoding"];
+      const transferredSize = contentLength ? parseInt(contentLength, 10) : 0;
+      const encoding =
+        typeof contentEncoding === "string" ? contentEncoding : null;
+      let totalBytesReceived = 0;
+
       // Capture response body using PassThrough
       const responseChunks: Buffer[] = [];
 
@@ -288,9 +304,9 @@ function createInterceptor(
         if (event === "data") {
           dataListeners.push(listener as (chunk: Buffer) => void);
           return originalOn(event, (chunk: Buffer) => {
-            responseChunks.push(
-              Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk),
-            );
+            const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            responseChunks.push(buffer);
+            totalBytesReceived += buffer.length;
             listener(chunk);
           });
         } else if (event === "end") {
@@ -321,9 +337,21 @@ function createInterceptor(
               total: duration,
             });
 
+            // Calculate resource size (decompressed body size)
+            const body = stringifyBody(responseChunks);
+            const resourceSize = Buffer.byteLength(body, "utf-8");
+
+            // Emit size info
+            interceptorEmitter.emit("size-update", {
+              id: requestId,
+              transferred: transferredSize || totalBytesReceived,
+              resource: resourceSize,
+              encoding,
+            });
+
             interceptorEmitter.emit("response-complete", {
               id: requestId,
-              body: stringifyBody(responseChunks),
+              body,
               duration,
             });
             listener();

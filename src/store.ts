@@ -13,6 +13,7 @@ import {
   type ResponseCompleteEvent,
   type RequestErrorEvent,
   type TimingUpdateEvent,
+  type SizeUpdateEvent,
 } from "./interceptor.js";
 
 // ============================================================================
@@ -34,6 +35,15 @@ export interface TimingBreakdown {
   total: number;
 }
 
+export interface SizeInfo {
+  /** Transferred size (as received over network, possibly compressed) */
+  transferred: number;
+  /** Resource size (uncompressed body size) */
+  resource: number;
+  /** Compression encoding (gzip, br, deflate, or null if none) */
+  encoding: string | null;
+}
+
 export interface RequestLog {
   id: string;
   url: string;
@@ -50,6 +60,7 @@ export interface RequestLog {
   resBody: string;
   error?: string;
   timing?: TimingBreakdown;
+  size?: SizeInfo;
 }
 
 export type StoreListener = (logs: RequestLog[]) => void;
@@ -227,6 +238,21 @@ class RequestStore {
   }
 
   /**
+   * Update size info
+   */
+  private updateSize(event: SizeUpdateEvent): void {
+    const log = this.logs.get(event.id);
+    if (log) {
+      log.size = {
+        transferred: event.transferred,
+        resource: event.resource,
+        encoding: event.encoding,
+      };
+      this.notifyListeners();
+    }
+  }
+
+  /**
    * Attach listeners to the interceptor
    */
   private attachInterceptorListeners(): void {
@@ -254,6 +280,10 @@ class RequestStore {
 
     interceptorEmitter.on("timing-update", (event) => {
       this.updateTiming(event);
+    });
+
+    interceptorEmitter.on("size-update", (event) => {
+      this.updateSize(event);
     });
 
     this.isListening = true;

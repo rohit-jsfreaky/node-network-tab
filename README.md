@@ -19,6 +19,7 @@
 - ⚡ **Real-time Updates** - See requests as they happen
 - 🔎 **Smart Filtering** - Filter by URL, method (GET/POST), status (200/500), or fuzzy search
 - ⏱️ **Timing Breakdown** - See where time went: DNS, TCP, TTFB, Download with waterfall chart
+- 📦 **Size & Compression** - See transferred vs resource size with compression savings
 - 📋 **Request/Response Details** - View headers, body, and response data
 - 📝 **JSON Formatting** - Pretty-printed JSON bodies
 - ⌨️ **Keyboard Navigation** - Vim-style (j/k) and arrow key support
