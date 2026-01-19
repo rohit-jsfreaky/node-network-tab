@@ -16,7 +16,7 @@
 
 import React from "react";
 import { render, type Instance } from "ink";
-import { App } from "./ui/App.js";
+import { App, type StoreLike } from "./ui/App.js";
 import {
   startInterceptor,
   stopInterceptor,
@@ -29,6 +29,7 @@ import {
   type RequestLog,
   type RequestStatus,
 } from "./store.js";
+import { RemoteStore, connectToIpc, startIpcServer } from "./ipc.js";
 
 // ============================================================================
 // UI Rendering
@@ -36,11 +37,16 @@ import {
 
 let inkInstance: Instance | null = null;
 
+export interface RenderUIOptions {
+  store?: StoreLike;
+  onReplay?: (log: RequestLog) => void;
+}
+
 /**
  * Render the TUI dashboard.
  * Only works in TTY terminals.
  */
-export function renderUI(): Instance | null {
+export function renderUI(options?: RenderUIOptions): Instance | null {
   // Check if we're in a TTY
   if (!process.stdout.isTTY) {
     console.warn("[node-network-tab] Not a TTY, skipping UI rendering.");
@@ -53,7 +59,10 @@ export function renderUI(): Instance | null {
   }
 
   // Render the Ink app
-  inkInstance = render(React.createElement(App));
+  inkInstance = render(React.createElement(App, {
+    store: options?.store,
+    onReplay: options?.onReplay,
+  }));
 
   // Handle cleanup
   inkInstance.waitUntilExit().then(() => {
@@ -109,6 +118,11 @@ export {
   // Store
   store,
   getStore,
+
+  // IPC
+  startIpcServer,
+  connectToIpc,
+  RemoteStore,
 
   // Types
   type RequestLog,

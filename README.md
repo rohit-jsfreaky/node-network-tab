@@ -36,18 +36,34 @@ npm install node-network-tab
 
 ## 🚀 Quick Start
 
-### Zero-Config Mode (Recommended)
+### Separate Terminal Mode (Recommended)
 
-Simply import at the top of your application:
+This keeps your app logs clean and opens the UI in a second terminal:
 
 ```javascript
 import 'node-network-tab/start';
 
 // Your application code...
 // All HTTP/HTTPS requests are now monitored!
+```
 
-// Example: Make some requests
-fetch('https://api.github.com/users/rohit-jsfreaky');
+```bash
+# Terminal 1: run your app as usual
+node server.js
+
+# (optional) explicit headless flag
+NODE_NETWORK_TAB_HEADLESS=1 node server.js
+
+# Terminal 2: open the viewer
+npx node-network-tab
+```
+
+### Inline UI Mode (optional)
+
+If you prefer the UI to open in the same terminal as your app:
+
+```bash
+NODE_NETWORK_TAB_INLINE_UI=1 node server.js
 ```
 
 ### Programmatic Mode
@@ -67,6 +83,14 @@ renderUI();
 
 // Stop intercepting when done
 stopInterceptor();
+```
+
+### Headless Logs (optional)
+
+If you want minimal request logs in the app terminal (without UI):
+
+```bash
+NODE_NETWORK_TAB_HEADLESS_LOGS=1 node server.js
 ```
 
 ## 🎮 Keyboard Controls

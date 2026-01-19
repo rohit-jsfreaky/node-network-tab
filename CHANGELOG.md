@@ -21,3 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Production safety check (disabled when NODE_ENV=production)
 - Memory-safe 50-request circular buffer
 - Headless mode for non-TTY environments
+
+## [1.1.0] - 2026-01-19
+
+### Added
+- Separate terminal viewer (`npx node-network-tab`) with IPC-based log streaming
+- Inline UI opt-in via `NODE_NETWORK_TAB_INLINE_UI=1`
+- Optional headless console logging via `NODE_NETWORK_TAB_HEADLESS_LOGS=1`

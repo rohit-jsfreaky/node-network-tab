@@ -8,19 +8,27 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 import TextInput from "ink-text-input";
-import { store, type RequestLog } from "../store.js";
+import { store, type RequestLog, type StoreListener } from "../store.js";
 import { RequestList } from "./RequestList.js";
 import { RequestDetails } from "./RequestDetails.js";
 import { exec } from "node:child_process";
 import { platform } from "node:os";
-import http from "node:http";
-import https from "node:https";
+import { replayRequest } from "../replay.js";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 type DetailTab = "headers" | "body" | "response";
+
+export interface StoreLike {
+  subscribe: (listener: StoreListener) => () => void;
+}
+
+export interface AppProps {
+  store?: StoreLike;
+  onReplay?: (log: RequestLog) => void;
+}
 
 // ============================================================================
 // Clipboard Helper
@@ -117,44 +125,6 @@ function generateCurlCommand(log: RequestLog): string {
 }
 
 // ============================================================================
-// Request Replay Helper
-// ============================================================================
-
-function replayRequest(log: RequestLog): void {
-  const isHttps = log.protocol === "https";
-  const requestModule = isHttps ? https : http;
-
-  // Parse URL to get options
-  const urlObj = new URL(log.url);
-
-  const options: http.RequestOptions = {
-    hostname: urlObj.hostname,
-    port: urlObj.port || (isHttps ? 443 : 80),
-    path: urlObj.pathname + urlObj.search,
-    method: log.method,
-    headers: log.reqHeaders as http.OutgoingHttpHeaders,
-  };
-
-  // Make the request (it will be intercepted and added to the store automatically)
-  const req = requestModule.request(options, (res) => {
-    // Consume the response to complete the request
-    res.on("data", () => {});
-    res.on("end", () => {});
-  });
-
-  req.on("error", () => {
-    // Error is handled by the interceptor
-  });
-
-  // Send the request body if there was one
-  if (log.reqBody) {
-    req.write(log.reqBody);
-  }
-
-  req.end();
-}
-
-// ============================================================================
 // Filter Helper
 // ============================================================================
 
@@ -224,9 +194,11 @@ function filterLogs(logs: RequestLog[], query: string): RequestLog[] {
 // App Component
 // ============================================================================
 
-export function App(): React.ReactElement {
+export function App({ store: storeOverride, onReplay }: AppProps): React.ReactElement {
   const { exit } = useApp();
   const { stdout } = useStdout();
+
+  const activeStore = storeOverride ?? store;
 
   const [logs, setLogs] = useState<RequestLog[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -247,11 +219,11 @@ export function App(): React.ReactElement {
 
   // Subscribe to store updates
   useEffect(() => {
-    const unsubscribe = store.subscribe((newLogs) => {
+    const unsubscribe = activeStore.subscribe((newLogs) => {
       setLogs(newLogs);
     });
     return unsubscribe;
-  }, []);
+  }, [activeStore]);
 
   // Filter logs based on query
   const filteredLogs = useMemo(() => {
@@ -375,7 +347,11 @@ export function App(): React.ReactElement {
       // Replay request
       if (input === "r" || input === "R") {
         if (selectedLog) {
-          replayRequest(selectedLog);
+          if (onReplay) {
+            onReplay(selectedLog);
+          } else {
+            replayRequest(selectedLog);
+          }
           setCopyStatus("↻ Replaying...");
         }
         return;

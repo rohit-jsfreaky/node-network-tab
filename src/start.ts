@@ -16,6 +16,7 @@ import {
   renderUI,
   stopInterceptor,
   unmountUI,
+  startIpcServer,
 } from "./index.js";
 
 // ============================================================================
@@ -23,6 +24,24 @@ import {
 // ============================================================================
 
 const isDevelopment = process.env.NODE_ENV !== "production";
+const mode = (process.env.NODE_NETWORK_TAB_MODE || "").toLowerCase();
+const inlineUIEnabled =
+  mode === "inline" ||
+  process.env.NODE_NETWORK_TAB_INLINE_UI === "1" ||
+  process.env.NODE_NETWORK_TAB_INLINE_UI === "true";
+const headlessEnabled =
+  mode === "headless" ||
+  process.env.NODE_NETWORK_TAB_HEADLESS === "1" ||
+  process.env.NODE_NETWORK_TAB_HEADLESS === "true";
+const silentMode =
+  mode === "silent" ||
+  headlessEnabled ||
+  process.env.NODE_NETWORK_TAB_SILENT === "1" ||
+  process.env.NODE_NETWORK_TAB_SILENT === "true";
+const headlessLogsEnabled =
+  mode === "headless-logs" ||
+  process.env.NODE_NETWORK_TAB_HEADLESS_LOGS === "1" ||
+  process.env.NODE_NETWORK_TAB_HEADLESS_LOGS === "true";
 
 if (!isDevelopment) {
   console.warn(
@@ -34,22 +53,23 @@ if (!isDevelopment) {
   // Start intercepting
   startInterceptor();
 
-  // Start UI if in TTY
-  if (process.stdout.isTTY) {
+  // Start IPC server for external UI
+  startIpcServer();
+
+  if (inlineUIEnabled && process.stdout.isTTY) {
     // Small delay to let the app initialize first
     setImmediate(() => {
       renderUI();
     });
-  } else {
-    // Headless mode - just log to console
+  } else if (!silentMode && (headlessLogsEnabled || !process.stdout.isTTY)) {
+    // Optional headless logging mode
     console.log(
-      "[node-network-tab] Running in headless mode (no TTY detected).",
+      "[node-network-tab] Running in headless mode (no inline UI).",
     );
     console.log(
-      "[node-network-tab] HTTP requests are being intercepted but not displayed.",
+      "[node-network-tab] Use `npx node-network-tab` to open the UI.",
     );
 
-    // Import and subscribe to store for minimal logging
     import("./store.js").then(({ store }) => {
       store.subscribe((logs) => {
         const latest = logs[0];
