@@ -1,7 +1,16 @@
 /**
- * Test script for node-network-tab
+ * Test script for node-network-tab with filtering demo
  *
  * Run: node test/demo.mjs
+ *
+ * This script makes various HTTP requests to demonstrate filtering:
+ * - Press / or f to open filter
+ * - Type "GET" to show only GET requests
+ * - Type "POST" to show only POST requests
+ * - Type "200" to show only successful requests
+ * - Type "user" to fuzzy search for user-related endpoints
+ * - Type "error" to show failed requests
+ * - Press Esc to clear filter
  */
 
 import "../dist/start.js";
@@ -10,37 +19,72 @@ import https from "node:https";
 // Wait a bit for the UI to initialize
 await new Promise((resolve) => setTimeout(resolve, 500));
 
-console.log("\n🧪 Making test HTTP requests...\n");
+console.log("\n🧪 Making test HTTP requests for filtering demo...\n");
 
-// Test 1: Simple GET
-await makeRequest("https://jsonplaceholder.typicode.com/posts/1");
+// Make many different requests to test filtering
+const requests = [
+  // GET requests
+  { method: "GET", url: "https://jsonplaceholder.typicode.com/posts/1" },
+  { method: "GET", url: "https://jsonplaceholder.typicode.com/users/1" },
+  { method: "GET", url: "https://jsonplaceholder.typicode.com/users/2" },
+  {
+    method: "GET",
+    url: "https://jsonplaceholder.typicode.com/comments?postId=1",
+  },
+  { method: "GET", url: "https://jsonplaceholder.typicode.com/albums/1" },
 
-// Test 2: Another GET
-await makeRequest("https://jsonplaceholder.typicode.com/users/1");
+  // POST requests
+  {
+    method: "POST",
+    url: "https://jsonplaceholder.typicode.com/posts",
+    body: { title: "Test", body: "Hello", userId: 1 },
+  },
+  {
+    method: "POST",
+    url: "https://jsonplaceholder.typicode.com/posts",
+    body: { title: "Another", body: "World", userId: 2 },
+  },
 
-// Test 3: POST with body
-await makePostRequest(
-  "https://jsonplaceholder.typicode.com/posts",
-  JSON.stringify({ title: "Test", body: "Hello", userId: 1 }),
-);
+  // More GET requests
+  { method: "GET", url: "https://jsonplaceholder.typicode.com/todos/1" },
+  { method: "GET", url: "https://jsonplaceholder.typicode.com/photos/1" },
+];
 
-// Test 4: One more GET
-await makeRequest("https://jsonplaceholder.typicode.com/comments?postId=1");
+for (const req of requests) {
+  try {
+    if (req.method === "GET") {
+      await makeGetRequest(req.url);
+    } else if (req.method === "POST") {
+      await makePostRequest(req.url, JSON.stringify(req.body));
+    }
+    // Small delay between requests
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  } catch (err) {
+    console.log(`  ✗ ${req.method} ${req.url} → Error`);
+  }
+}
 
 console.log("\n✅ All test requests completed!");
-console.log("📊 Check the TUI above to see captured requests.");
-console.log("⌨️  Use ↑↓ to navigate, Tab to switch tabs, q to quit\n");
+console.log("\n🔎 FILTERING DEMO:");
+console.log("  Press / or f to open filter bar");
+console.log("  Try these filters:");
+console.log('    "GET"     → Show only GET requests');
+console.log('    "POST"    → Show only POST requests');
+console.log('    "user"    → Fuzzy search for user endpoints');
+console.log('    "200"     → Show successful requests');
+console.log('    "posts"   → Show posts endpoints');
+console.log("  Press Esc to clear filter");
+console.log("  Press Enter to apply and close filter bar\n");
 
-function makeRequest(url) {
+function makeGetRequest(url) {
   return new Promise((resolve, reject) => {
     https
       .get(url, (res) => {
         let data = "";
         res.on("data", (chunk) => (data += chunk));
         res.on("end", () => {
-          console.log(
-            `  ✓ GET ${url.split("/").slice(-2).join("/")} → ${res.statusCode}`,
-          );
+          const path = new URL(url).pathname;
+          console.log(`  ✓ GET ${path} → ${res.statusCode}`);
           resolve(data);
         });
       })

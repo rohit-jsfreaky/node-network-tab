@@ -2,6 +2,7 @@
  * Request List Component
  *
  * Scrollable sidebar showing all captured requests with color-coded status.
+ * Supports filtering with highlighted matching text.
  */
 
 import React, { useMemo } from "react";
@@ -18,6 +19,7 @@ interface RequestListProps {
   selectedIndex: number;
   onSelect: (index: number) => void;
   maxHeight: number;
+  filterQuery?: string;
 }
 
 // ============================================================================
@@ -76,12 +78,14 @@ interface RequestListItemProps {
   log: RequestLog;
   isSelected: boolean;
   width: number;
+  filterQuery?: string;
 }
 
 function RequestListItem({
   log,
   isSelected,
   width,
+  filterQuery,
 }: RequestListItemProps): React.ReactElement {
   const statusColor = getStatusColor(log.status);
   const methodColor = getMethodColor(log.method);
@@ -97,6 +101,17 @@ function RequestListItem({
     width - methodLength - statusLength - durationLength - 4,
   );
 
+  const truncatedPath = truncatePath(log.path, pathMaxLength);
+
+  // Check if method matches filter
+  const methodMatches =
+    filterQuery && log.method.toLowerCase() === filterQuery.toLowerCase();
+
+  // Check if status matches filter
+  const statusMatches =
+    filterQuery &&
+    formatStatus(log.status).toLowerCase().includes(filterQuery.toLowerCase());
+
   return (
     <Box paddingX={1}>
       <Box width={width - 2}>
@@ -106,20 +121,28 @@ function RequestListItem({
         </Text>
 
         {/* Method */}
-        <Text color={methodColor} bold>
+        <Text
+          color={methodMatches ? "cyan" : methodColor}
+          bold
+          inverse={methodMatches}
+        >
           {log.method.padEnd(7)}
         </Text>
 
         {/* Path */}
         <Text color={isSelected ? "white" : "gray"} wrap="truncate">
-          {truncatePath(log.path, pathMaxLength)}
+          {truncatedPath}
         </Text>
 
         {/* Spacer */}
         <Box flexGrow={1} />
 
         {/* Status */}
-        <Text color={statusColor} bold>
+        <Text
+          color={statusMatches ? "cyan" : statusColor}
+          bold
+          inverse={statusMatches}
+        >
           {" "}
           {formatStatus(log.status)}
         </Text>
@@ -140,6 +163,7 @@ export function RequestList({
   selectedIndex,
   onSelect,
   maxHeight,
+  filterQuery,
 }: RequestListProps): React.ReactElement {
   // Calculate visible window based on selected index
   const visibleLogs = useMemo(() => {
@@ -168,8 +192,17 @@ export function RequestList({
         height={maxHeight - 2}
         paddingX={1}
       >
-        <Text dimColor>No requests yet.</Text>
-        <Text dimColor>Make an HTTP request to see it here.</Text>
+        {filterQuery ? (
+          <>
+            <Text dimColor>No matching requests.</Text>
+            <Text dimColor>Press Esc to clear filter.</Text>
+          </>
+        ) : (
+          <>
+            <Text dimColor>No requests yet.</Text>
+            <Text dimColor>Make an HTTP request to see it here.</Text>
+          </>
+        )}
       </Box>
     );
   }
@@ -182,6 +215,7 @@ export function RequestList({
           log={log}
           isSelected={originalIndex === selectedIndex}
           width={35}
+          filterQuery={filterQuery}
         />
       ))}
 

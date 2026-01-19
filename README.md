@@ -17,6 +17,7 @@
 - 🔒 **Non-Destructive** - Intercepts requests without modifying behavior
 - 🎨 **Beautiful TUI** - Professional terminal UI with color-coded status
 - ⚡ **Real-time Updates** - See requests as they happen
+- 🔎 **Smart Filtering** - Filter by URL, method (GET/POST), status (200/500), or fuzzy search
 - 📋 **Request/Response Details** - View headers, body, and response data
 - 📝 **JSON Formatting** - Pretty-printed JSON bodies
 - ⌨️ **Keyboard Navigation** - Vim-style (j/k) and arrow key support
@@ -69,41 +70,53 @@ stopInterceptor();
 
 | Key | Action |
 |-----|--------|
+| `/` or `f` | **Open filter bar** |
 | `↑` / `k` | Navigate up (requests or scroll in expand mode) |
 | `↓` / `j` | Navigate down (requests or scroll in expand mode) |
 | `Tab` / `l` / `h` | Switch detail tabs |
 | `1` | Headers tab |
 | `2` | Body tab |
 | `3` | Response tab |
-| `e` | **Toggle expand mode** (full-screen detail view with scrolling) |
-| `y` | **Copy current tab content to clipboard** |
-| `c` | Clear all requests |
+| `e` | Toggle expand mode (full-screen detail view) |
+| `y` | Copy current tab content to clipboard |
+| `c` | Clear all requests and filter |
 | `q` | Quit |
+
+## 🔎 Smart Filtering
+
+Press `/` or `f` to open the filter bar. The filter supports:
+
+| Filter Type | Example | Description |
+|------------|---------|-------------|
+| **Method** | `GET`, `POST` | Show only requests with that method |
+| **Status Code** | `200`, `404`, `5` | Match exact code or prefix (5 = 5xx) |
+| **Status Keywords** | `error`, `success`, `pending` | Filter by status category |
+| **Fuzzy Search** | `user`, `api` | Match any part of URL/path |
+
+```
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ 🔍 Node Network Tab                     🔎 "GET" 3/9 | /:filter | q:quit      │
+└───────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────┐┌───────────────────────────────────────────┐
+│ Requests (filtered)              ││ GET https://api.example.com/users         │
+│                                  ││                                           │
+│ ▶ GET    /users        200 142ms ││  [ 1:Headers ] [ 2:Body ] [ 3:Response ]  │
+│   GET    /users/1      200 89ms  ││                                           │
+│   GET    /posts        200 156ms ││  Status: 200 (142ms)                      │
+└──────────────────────────────────┘└───────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ 🔎 Filter: GET                                | Enter:apply | Esc:clear       │
+└───────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Filter Bar Controls:**
+- Type to filter requests
+- Press `Enter` to apply and close the filter bar
+- Press `Esc` to clear the filter and close
 
 ## 🔍 Expand Mode
 
 Press `e` to toggle expand mode and view the full response/body/headers:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 🔍 Node Network Tab                    1 request | e:expand | y:copy | q:quit│
-└─────────────────────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ GET https://jsonplaceholder.typicode.com/posts/1                            │
-│  1:Headers   2:Body   3:Response                                            │
-│                                                                             │
-│ Status: 200 (142ms)                                                         │
-│                                                                             │
-│ 📥 Response Body ◉ EXPANDED | Line 1/25 | y:copy | e:collapse               │
-│                                                                             │
-│  {                                                                          │
-│    "userId": 1,                                                             │
-│    "id": 1,                                                                 │
-│    "title": "sunt aut facere repellat provident occaecati excepturi",       │
-│    "body": "quia et suscipit\nsuscipit recusandae consequuntur..."          │
-│  }                                                                          │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
 
 **In Expand Mode:**
 - Use `↑/↓` or `j/k` to scroll through content
@@ -124,7 +137,6 @@ Press `e` to toggle expand mode and view the full response/body/headers:
 │                    │  {                                     │
 │                    │    "users": [...]                      │
 │                    │  }                                     │
-│                    │  ... (25 more lines, press 'e')        │
 └────────────────────┴────────────────────────────────────────┘
 ```
 
@@ -177,15 +189,6 @@ import type {
 3. **EventEmitter Architecture** - Internal events update the store and UI
 4. **Ink TUI** - React-based terminal UI with real-time updates
 
-```mermaid
-graph LR
-    A[Your App] --> B[http.request]
-    B --> C[Interceptor]
-    C --> D[Original Request]
-    C --> E[Store]
-    E --> F[TUI Dashboard]
-```
-
 ## 📋 Requirements
 
 - Node.js >= 18.0.0
@@ -200,6 +203,7 @@ graph LR
 | Real-time | ✅ | ✅ | ❌ |
 | Pretty UI | ✅ | ❌ | ✅ |
 | In-process | ✅ | ✅ | ❌ |
+| **Smart Filtering** | ✅ | ❌ | ✅ |
 | Expand/Scroll | ✅ | ❌ | ✅ |
 | Copy to Clipboard | ✅ | ❌ | ✅ |
 
