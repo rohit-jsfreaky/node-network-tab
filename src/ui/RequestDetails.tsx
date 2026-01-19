@@ -99,6 +99,94 @@ function formatHeaders(
 }
 
 // ============================================================================
+// JSON Syntax Highlighting Component
+// ============================================================================
+
+interface TokenPart {
+  text: string;
+  color: "blue" | "green" | "yellow" | "red" | "gray" | "white";
+}
+
+function tokenizeLine(line: string): TokenPart[] {
+  const parts: TokenPart[] = [];
+  let remaining = line;
+
+  while (remaining.length > 0) {
+    // Match JSON key (quoted string followed by colon)
+    const keyMatch = remaining.match(/^(\s*)("(?:[^"\\]|\\.)*")(\s*:)/);
+    if (keyMatch) {
+      if (keyMatch[1]) parts.push({ text: keyMatch[1], color: "white" });
+      parts.push({ text: keyMatch[2], color: "blue" });
+      parts.push({ text: keyMatch[3], color: "white" });
+      remaining = remaining.slice(keyMatch[0].length);
+      continue;
+    }
+
+    // Match string value
+    const stringMatch = remaining.match(/^(\s*)("(?:[^"\\]|\\.)*")(,?)/);
+    if (stringMatch) {
+      if (stringMatch[1]) parts.push({ text: stringMatch[1], color: "white" });
+      parts.push({ text: stringMatch[2], color: "green" });
+      if (stringMatch[3]) parts.push({ text: stringMatch[3], color: "white" });
+      remaining = remaining.slice(stringMatch[0].length);
+      continue;
+    }
+
+    // Match number
+    const numberMatch = remaining.match(/^(\s*)(-?\d+\.?\d*)(,?)/);
+    if (numberMatch) {
+      if (numberMatch[1]) parts.push({ text: numberMatch[1], color: "white" });
+      parts.push({ text: numberMatch[2], color: "yellow" });
+      if (numberMatch[3]) parts.push({ text: numberMatch[3], color: "white" });
+      remaining = remaining.slice(numberMatch[0].length);
+      continue;
+    }
+
+    // Match boolean/null
+    const boolMatch = remaining.match(/^(\s*)(true|false|null)(,?)/);
+    if (boolMatch) {
+      if (boolMatch[1]) parts.push({ text: boolMatch[1], color: "white" });
+      parts.push({ text: boolMatch[2], color: "red" });
+      if (boolMatch[3]) parts.push({ text: boolMatch[3], color: "white" });
+      remaining = remaining.slice(boolMatch[0].length);
+      continue;
+    }
+
+    // Match brackets/braces
+    const bracketMatch = remaining.match(/^(\s*)([\[\]{}])(,?)/);
+    if (bracketMatch) {
+      if (bracketMatch[1])
+        parts.push({ text: bracketMatch[1], color: "white" });
+      parts.push({ text: bracketMatch[2], color: "gray" });
+      if (bracketMatch[3])
+        parts.push({ text: bracketMatch[3], color: "white" });
+      remaining = remaining.slice(bracketMatch[0].length);
+      continue;
+    }
+
+    // No match, consume one character
+    parts.push({ text: remaining[0], color: "white" });
+    remaining = remaining.slice(1);
+  }
+
+  return parts;
+}
+
+function SyntaxHighlightedLine({ line }: { line: string }): React.ReactElement {
+  const parts = tokenizeLine(line);
+
+  return (
+    <Text>
+      {parts.map((part, i) => (
+        <Text key={i} color={part.color}>
+          {part.text}
+        </Text>
+      ))}
+    </Text>
+  );
+}
+
+// ============================================================================
 // Timing Waterfall Component
 // ============================================================================
 
@@ -410,13 +498,15 @@ function BodyView({
 
       <Box flexDirection="column" marginLeft={1}>
         {bodyLines.map((line, i) => (
-          <Text
-            key={i}
-            wrap={isExpanded ? "wrap" : "truncate"}
-            color={line.startsWith("...") ? "gray" : "white"}
-          >
-            {line}
-          </Text>
+          <Box key={i}>
+            {line.startsWith("...") ? (
+              <Text wrap={isExpanded ? "wrap" : "truncate"} color="gray">
+                {line}
+              </Text>
+            ) : (
+              <SyntaxHighlightedLine line={line} />
+            )}
+          </Box>
         ))}
       </Box>
     </Box>
@@ -500,13 +590,15 @@ function ResponseView({
           <Text dimColor>Waiting for response...</Text>
         ) : (
           bodyLines.map((line, i) => (
-            <Text
-              key={i}
-              wrap={isExpanded ? "wrap" : "truncate"}
-              color={line.startsWith("...") ? "gray" : "white"}
-            >
-              {line}
-            </Text>
+            <Box key={i}>
+              {line.startsWith("...") ? (
+                <Text wrap={isExpanded ? "wrap" : "truncate"} color="gray">
+                  {line}
+                </Text>
+              ) : (
+                <SyntaxHighlightedLine line={line} />
+              )}
+            </Box>
           ))
         )}
       </Box>

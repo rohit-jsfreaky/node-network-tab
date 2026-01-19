@@ -22,7 +22,7 @@
 - 📦 **Size & Compression** - See transferred vs resource size with compression savings
 - 🔄 **Request Replay** - Re-run any request without restarting the app
 - 📋 **Request/Response Details** - View headers, body, and response data
-- 📝 **JSON Formatting** - Pretty-printed JSON bodies
+- 🎨 **Syntax Highlighting** - Colorized JSON with keys, strings, numbers, booleans
 - ⌨️ **Keyboard Navigation** - Vim-style (j/k) and arrow key support
 - 🔍 **Expand Mode** - View full response body with scrolling
 - 📋 **Copy to Clipboard** - Copy headers/body/response or as cURL command
