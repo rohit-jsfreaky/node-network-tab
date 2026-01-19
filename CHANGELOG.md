@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory-safe 50-request circular buffer
 - Headless mode for non-TTY environments
 
+## [1.1.1] - 2026-01-19
+
+### Fixed
+- Capture requests made via global fetch
+- Reduce published package size by excluding sourcemaps
+
 ## [1.1.0] - 2026-01-19
 
 ### Added
