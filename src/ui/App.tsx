@@ -56,6 +56,65 @@ function copyToClipboard(text: string): Promise<void> {
 }
 
 // ============================================================================
+// cURL Command Generator
+// ============================================================================
+
+function generateCurlCommand(log: RequestLog): string {
+  const parts: string[] = ["curl"];
+
+  // Add method (skip for GET as it's default)
+  if (log.method.toUpperCase() !== "GET") {
+    parts.push(`-X ${log.method.toUpperCase()}`);
+  }
+
+  // Add URL (with proper quoting)
+  parts.push(`"${log.url}"`);
+
+  // Add headers
+  const headers = log.reqHeaders;
+  for (const [key, value] of Object.entries(headers)) {
+    if (value !== undefined) {
+      const headerValue = Array.isArray(value) ? value.join(", ") : value;
+      // Skip some internal headers that curl handles
+      const skipHeaders = ["host", "content-length", "connection"];
+      if (!skipHeaders.includes(key.toLowerCase())) {
+        // Escape double quotes in header values
+        const escapedValue = headerValue.replace(/"/g, '\\"');
+        parts.push(`-H "${key}: ${escapedValue}"`);
+      }
+    }
+  }
+
+  // Add request body if present
+  if (log.reqBody && log.reqBody.trim()) {
+    // Try to detect if it's JSON
+    try {
+      JSON.parse(log.reqBody);
+      // It's valid JSON, add Content-Type if not already present
+      const hasContentType = Object.keys(headers).some(
+        (k) => k.toLowerCase() === "content-type",
+      );
+      if (!hasContentType) {
+        parts.push('-H "Content-Type: application/json"');
+      }
+    } catch {
+      // Not JSON, that's okay
+    }
+
+    // Escape single quotes in body for shell
+    const escapedBody = log.reqBody.replace(/'/g, "'\\''");
+    parts.push(`-d '${escapedBody}'`);
+  }
+
+  // Join with backslash for multi-line (more readable)
+  if (parts.length > 3) {
+    return parts.join(" \\\n  ");
+  }
+
+  return parts.join(" ");
+}
+
+// ============================================================================
 // Filter Helper
 // ============================================================================
 
@@ -262,6 +321,17 @@ export function App(): React.ReactElement {
         return;
       }
 
+      // Copy as cURL
+      if (input === "x" || input === "X") {
+        if (selectedLog) {
+          const curlCommand = generateCurlCommand(selectedLog);
+          copyToClipboard(curlCommand)
+            .then(() => setCopyStatus("✓ cURL copied!"))
+            .catch(() => setCopyStatus("✗ Copy failed"));
+        }
+        return;
+      }
+
       // Scroll in expanded mode
       if (isExpanded) {
         if (key.upArrow || input === "k") {
@@ -344,8 +414,8 @@ export function App(): React.ReactElement {
             </Text>
           )}
           <Text dimColor>
-            {filteredLogs.length}/{logs.length} | /:filter | q:quit | e:expand |
-            y:copy
+            {filteredLogs.length}/{logs.length} | /:filter | x:curl | y:copy |
+            e:expand
           </Text>
         </Box>
       </Box>

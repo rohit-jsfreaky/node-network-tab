@@ -78,6 +78,7 @@ stopInterceptor();
 | `2` | Body tab |
 | `3` | Response tab |
 | `e` | Toggle expand mode (full-screen detail view) |
+| `x` | **Copy request as cURL command** |
 | `y` | Copy current tab content to clipboard |
 | `c` | Clear all requests and filter |
 | `q` | Quit |
