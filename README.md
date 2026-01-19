@@ -20,6 +20,7 @@
 - 🔎 **Smart Filtering** - Filter by URL, method (GET/POST), status (200/500), or fuzzy search
 - ⏱️ **Timing Breakdown** - See where time went: DNS, TCP, TTFB, Download with waterfall chart
 - 📦 **Size & Compression** - See transferred vs resource size with compression savings
+- 🔄 **Request Replay** - Re-run any request without restarting the app
 - 📋 **Request/Response Details** - View headers, body, and response data
 - 📝 **JSON Formatting** - Pretty-printed JSON bodies
 - ⌨️ **Keyboard Navigation** - Vim-style (j/k) and arrow key support
@@ -80,7 +81,8 @@ stopInterceptor();
 | `2` | Body tab |
 | `3` | Response tab |
 | `e` | Toggle expand mode (full-screen detail view) |
-| `x` | **Copy request as cURL command** |
+| `r` | **Replay selected request** |
+| `x` | Copy request as cURL command |
 | `y` | Copy current tab content to clipboard |
 | `c` | Clear all requests and filter |
 | `q` | Quit |

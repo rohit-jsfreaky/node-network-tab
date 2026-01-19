@@ -13,6 +13,8 @@ import { RequestList } from "./RequestList.js";
 import { RequestDetails } from "./RequestDetails.js";
 import { exec } from "node:child_process";
 import { platform } from "node:os";
+import http from "node:http";
+import https from "node:https";
 
 // ============================================================================
 // Types
@@ -112,6 +114,44 @@ function generateCurlCommand(log: RequestLog): string {
   }
 
   return parts.join(" ");
+}
+
+// ============================================================================
+// Request Replay Helper
+// ============================================================================
+
+function replayRequest(log: RequestLog): void {
+  const isHttps = log.protocol === "https";
+  const requestModule = isHttps ? https : http;
+
+  // Parse URL to get options
+  const urlObj = new URL(log.url);
+
+  const options: http.RequestOptions = {
+    hostname: urlObj.hostname,
+    port: urlObj.port || (isHttps ? 443 : 80),
+    path: urlObj.pathname + urlObj.search,
+    method: log.method,
+    headers: log.reqHeaders as http.OutgoingHttpHeaders,
+  };
+
+  // Make the request (it will be intercepted and added to the store automatically)
+  const req = requestModule.request(options, (res) => {
+    // Consume the response to complete the request
+    res.on("data", () => {});
+    res.on("end", () => {});
+  });
+
+  req.on("error", () => {
+    // Error is handled by the interceptor
+  });
+
+  // Send the request body if there was one
+  if (log.reqBody) {
+    req.write(log.reqBody);
+  }
+
+  req.end();
 }
 
 // ============================================================================
@@ -332,6 +372,15 @@ export function App(): React.ReactElement {
         return;
       }
 
+      // Replay request
+      if (input === "r" || input === "R") {
+        if (selectedLog) {
+          replayRequest(selectedLog);
+          setCopyStatus("↻ Replaying...");
+        }
+        return;
+      }
+
       // Scroll in expanded mode
       if (isExpanded) {
         if (key.upArrow || input === "k") {
@@ -414,8 +463,8 @@ export function App(): React.ReactElement {
             </Text>
           )}
           <Text dimColor>
-            {filteredLogs.length}/{logs.length} | /:filter | x:curl | y:copy |
-            e:expand
+            {filteredLogs.length}/{logs.length} | /:filter | r:replay | x:curl |
+            y:copy
           </Text>
         </Box>
       </Box>
