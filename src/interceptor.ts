@@ -115,6 +115,7 @@ let originalHttpRequest: typeof http.request | null = null;
 let originalHttpsRequest: typeof https.request | null = null;
 let originalHttpGet: typeof http.get | null = null;
 let originalHttpsGet: typeof https.get | null = null;
+let originalFetch: typeof fetch | null = null;
 
 let isIntercepting = false;
 
@@ -219,6 +220,51 @@ function stringifyBody(chunks: Buffer[]): string {
     return buffer.toString("utf-8");
   } catch {
     return "[Binary data]";
+  }
+}
+
+function headersToRecord(headers: Headers): Record<string, string> {
+  const result: Record<string, string> = {};
+  headers.forEach((value, key) => {
+    result[key] = value;
+  });
+  return result;
+}
+
+function headersInitToRecord(
+  headers: HeadersInit | undefined,
+): Record<string, string> {
+  if (!headers) return {};
+  if (headers instanceof Headers) return headersToRecord(headers);
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(
+      headers.map(([key, value]) => [key, String(value)]),
+    );
+  }
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (value !== undefined) {
+      result[key] = Array.isArray(value) ? value.join(", ") : String(value);
+    }
+  }
+  return result;
+}
+
+function stringifyFetchBody(body: unknown): string {
+  if (body == null) return "";
+  if (typeof body === "string") return body;
+  if (Buffer.isBuffer(body)) return body.toString("utf-8");
+  if (body instanceof URLSearchParams) return body.toString();
+  if (body instanceof ArrayBuffer) {
+    return Buffer.from(body).toString("utf-8");
+  }
+  if (ArrayBuffer.isView(body)) {
+    return Buffer.from(body.buffer).toString("utf-8");
+  }
+  try {
+    return JSON.stringify(body);
+  } catch {
+    return "[Body stream]";
   }
 }
 
@@ -612,6 +658,9 @@ export function startInterceptor(): void {
   originalHttpsRequest = https.request;
   originalHttpGet = http.get;
   originalHttpsGet = https.get;
+  if (typeof globalThis.fetch === "function") {
+    originalFetch = globalThis.fetch;
+  }
 
   // Patch request functions
   http.request = createInterceptor(originalHttpRequest, "http");
@@ -629,6 +678,119 @@ export function startInterceptor(): void {
     req.end();
     return req;
   } as typeof https.get;
+
+  if (originalFetch) {
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const requestId = uuidv4();
+      const startTime = Date.now();
+
+      let url = "";
+      let method = "GET";
+      let headers: Record<string, string | string[] | undefined> = {};
+      let body = "";
+
+      if (typeof input === "string" || input instanceof URL) {
+        url = input.toString();
+      } else if (input instanceof Request) {
+        url = input.url;
+        method = input.method || method;
+        headers = headersToRecord(input.headers);
+      }
+
+      if (init?.method) method = init.method;
+      if (init?.headers) {
+        headers = { ...headers, ...headersInitToRecord(init.headers) };
+      }
+      if (init?.body !== undefined) {
+        body = stringifyFetchBody(init.body);
+      }
+
+      let protocol: "http" | "https" = "http";
+      let host = "unknown";
+      let path = "/";
+      try {
+        const urlObj = new URL(url);
+        protocol = urlObj.protocol === "https:" ? "https" : "http";
+        host = urlObj.host;
+        path = urlObj.pathname + urlObj.search;
+      } catch {
+        // Ignore URL parse errors
+      }
+
+      interceptorEmitter.emit("request-start", {
+        id: requestId,
+        method: method.toUpperCase(),
+        url,
+        protocol,
+        host,
+        path,
+        headers,
+        startTime,
+      });
+
+      if (body) {
+        interceptorEmitter.emit("request-body", { id: requestId, body });
+      }
+
+      try {
+        const response = await originalFetch!(input as RequestInfo, init);
+
+        interceptorEmitter.emit("response-headers", {
+          id: requestId,
+          statusCode: response.status,
+          statusMessage: response.statusText || "",
+          headers: headersToRecord(response.headers),
+        });
+
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+
+        let bodyText = "";
+        try {
+          bodyText = await response.clone().text();
+        } catch {
+          bodyText = "[Binary data]";
+        }
+
+        const contentLength = response.headers.get("content-length");
+        const transferred = contentLength ? parseInt(contentLength, 10) : 0;
+        const resource = Buffer.byteLength(bodyText || "", "utf-8");
+        const encoding = response.headers.get("content-encoding");
+
+        interceptorEmitter.emit("timing-update", {
+          id: requestId,
+          dns: 0,
+          tcp: 0,
+          ttfb: 0,
+          download: 0,
+          total: duration,
+        });
+
+        interceptorEmitter.emit("size-update", {
+          id: requestId,
+          transferred: transferred || resource,
+          resource,
+          encoding: encoding || null,
+        });
+
+        interceptorEmitter.emit("response-complete", {
+          id: requestId,
+          body: bodyText,
+          duration,
+        });
+
+        return response;
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        interceptorEmitter.emit("request-error", {
+          id: requestId,
+          error: error instanceof Error ? error.message : String(error),
+          duration,
+        });
+        throw error;
+      }
+    };
+  }
 
   isIntercepting = true;
 }
@@ -659,6 +821,11 @@ export function stopInterceptor(): void {
   if (originalHttpsGet) {
     https.get = originalHttpsGet;
     originalHttpsGet = null;
+  }
+
+  if (originalFetch) {
+    globalThis.fetch = originalFetch;
+    originalFetch = null;
   }
 
   isIntercepting = false;
